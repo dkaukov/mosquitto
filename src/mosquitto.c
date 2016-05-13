@@ -205,6 +205,18 @@ void mosquitto__daemonise(void)
 #endif
 }
 
+#ifdef WIN32
+DWORD WINAPI ThreadFunc(void* data) {
+	char evt_name[127];
+	sprintf(evt_name, "ap%d_shutdown", GetCurrentProcessId());
+	HANDLE evt = CreateEvent(0, 1, 0, &evt_name);
+	WaitForSingleObject(evt, INFINITE);
+	CloseHandle(evt);
+	run = 0;
+	return 0;
+}
+#endif
+
 /* Signal handler for SIGUSR2 - vacuum the db. */
 void handle_sigusr2(int signal)
 {
@@ -367,6 +379,9 @@ int main(int argc, char *argv[])
 	signal(SIGUSR1, handle_sigusr1);
 	signal(SIGUSR2, handle_sigusr2);
 	signal(SIGPIPE, SIG_IGN);
+#endif
+#ifdef WIN32
+	CreateThread(NULL, 0, ThreadFunc, NULL, 0, NULL);
 #endif
 
 #ifdef WITH_BRIDGE
