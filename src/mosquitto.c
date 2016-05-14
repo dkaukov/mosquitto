@@ -207,9 +207,9 @@ void mosquitto__daemonise(void)
 
 #ifdef WIN32
 DWORD WINAPI ThreadFunc(void* data) {
-	char evt_name[127];
-	sprintf(evt_name, "ap%d_shutdown", GetCurrentProcessId());
-	HANDLE evt = CreateEvent(0, 1, 0, &evt_name);
+	TCHAR evt_name[127];
+	sprintf_s(evt_name, sizeof(evt_name) / sizeof(TCHAR), "ap%d_shutdown", GetCurrentProcessId());
+	HANDLE evt = CreateEvent(0, 1, 0, evt_name);
 	WaitForSingleObject(evt, INFINITE);
 	CloseHandle(evt);
 	run = 0;
