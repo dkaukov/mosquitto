@@ -216,43 +216,45 @@ void handle_sigusr2(int signal)
 *
 * Under Unix, mosquitto can be told to shutdown or restart by sending various
 * signals (HUP, USR, TERM). On NT we don't have easy access to signals, so
-* we use "events" instead. One of this events can be signalled
+* we use "events" instead. Any of this events can be signalled:
 *
 *    apPID_shutdown
 *    apPID_reload
 *    apPID_backup
 *    apPID_vacuum
 *
-* (where PID is the PID of the mosquitto parent process).
+* (where PID is the PID of the mosquitto process).
 */
 #ifdef WIN32
 DWORD WINAPI SigThreadProc(void* data) {
-	TCHAR evt_name[127];
-	HANDLE evt[4];
+	TCHAR evt_name[MAX_PATH];
+	static HANDLE evt[4];
 	int pid = GetCurrentProcessId();
-	sprintf_s(evt_name, sizeof(evt_name) / sizeof(TCHAR), "ap%d_shutdown", pid);
-	evt[0] = CreateEvent(0, 0, 0, evt_name);
-	sprintf_s(evt_name, sizeof(evt_name) / sizeof(TCHAR), "ap%d_reload", pid);
-	evt[1] = CreateEvent(0, 0, 0, evt_name);
-	sprintf_s(evt_name, sizeof(evt_name) / sizeof(TCHAR), "ap%d_backup", pid);
-	evt[2] = CreateEvent(0, 0, 0, evt_name);
-	sprintf_s(evt_name, sizeof(evt_name) / sizeof(TCHAR), "ap%d_vacuum", pid);
-	evt[3] = CreateEvent(0, 0, 0, evt_name);
-	while (run) {
-		switch (WaitForMultipleObjects(3, evt, 0, INFINITE)) {
+	sprintf_s(evt_name, MAX_PATH, "ap%d_shutdown", pid);
+	evt[0] = CreateEvent(NULL, TRUE, FALSE, evt_name);
+	sprintf_s(evt_name, MAX_PATH, "ap%d_reload", pid);
+	evt[1] = CreateEvent(NULL, FALSE, FALSE, evt_name);
+	sprintf_s(evt_name, MAX_PATH, "ap%d_backup", pid);
+	evt[2] = CreateEvent(NULL, FALSE, FALSE, evt_name);
+	sprintf_s(evt_name, MAX_PATH, "ap%d_vacuum", pid);
+	evt[3] = CreateEvent(NULL, FALSE, FALSE, evt_name);
+	while (true) {
+		int wr = WaitForMultipleObjects(sizeof(evt) / sizeof(HANDLE), evt, FALSE, INFINITE);
+		switch (wr) {
 		case WAIT_OBJECT_0 + 0:
 			handle_sigint(SIGINT);
 			break;
 		case WAIT_OBJECT_0 + 1:
 			flag_reload = true;
-			break;
+			continue;
 		case WAIT_OBJECT_0 + 2:
 			handle_sigusr1(0);
-			break;
+			continue;
 		case WAIT_OBJECT_0 + 3:
 			handle_sigusr2(0);
-			break;
+			continue;
 		}
+		break;
 	}
 	CloseHandle(evt[0]);
 	CloseHandle(evt[1]);
