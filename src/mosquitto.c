@@ -205,23 +205,62 @@ void mosquitto__daemonise(void)
 #endif
 }
 
-#ifdef WIN32
-DWORD WINAPI ThreadFunc(void* data) {
-	TCHAR evt_name[127];
-	sprintf_s(evt_name, sizeof(evt_name) / sizeof(TCHAR), "ap%d_shutdown", GetCurrentProcessId());
-	HANDLE evt = CreateEvent(0, 1, 0, evt_name);
-	WaitForSingleObject(evt, INFINITE);
-	CloseHandle(evt);
-	run = 0;
-	return 0;
-}
-#endif
-
 /* Signal handler for SIGUSR2 - vacuum the db. */
 void handle_sigusr2(int signal)
 {
 	flag_tree_print = true;
 }
+
+/*
+* Signalling mosquitto on NT.
+*
+* Under Unix, mosquitto can be told to shutdown or restart by sending various
+* signals (HUP, USR, TERM). On NT we don't have easy access to signals, so
+* we use "events" instead. One of this events can be signalled
+*
+*    apPID_shutdown
+*    apPID_reload
+*    apPID_backup
+*    apPID_vacuum
+*
+* (where PID is the PID of the mosquitto parent process).
+*/
+#ifdef WIN32
+DWORD WINAPI SigThreadProc(void* data) {
+	TCHAR evt_name[127];
+	HANDLE evt[4];
+	int pid = GetCurrentProcessId();
+	sprintf_s(evt_name, sizeof(evt_name) / sizeof(TCHAR), "ap%d_shutdown", pid);
+	evt[0] = CreateEvent(0, 0, 0, evt_name);
+	sprintf_s(evt_name, sizeof(evt_name) / sizeof(TCHAR), "ap%d_reload", pid);
+	evt[1] = CreateEvent(0, 0, 0, evt_name);
+	sprintf_s(evt_name, sizeof(evt_name) / sizeof(TCHAR), "ap%d_backup", pid);
+	evt[2] = CreateEvent(0, 0, 0, evt_name);
+	sprintf_s(evt_name, sizeof(evt_name) / sizeof(TCHAR), "ap%d_vacuum", pid);
+	evt[3] = CreateEvent(0, 0, 0, evt_name);
+	while (run) {
+		switch (WaitForMultipleObjects(3, evt, 0, INFINITE)) {
+		case WAIT_OBJECT_0 + 0:
+			handle_sigint(SIGINT);
+			break;
+		case WAIT_OBJECT_0 + 1:
+			flag_reload = true;
+			break;
+		case WAIT_OBJECT_0 + 2:
+			handle_sigusr1(0);
+			break;
+		case WAIT_OBJECT_0 + 3:
+			handle_sigusr2(0);
+			break;
+		}
+	}
+	CloseHandle(evt[0]);
+	CloseHandle(evt[1]);
+	CloseHandle(evt[2]);
+	CloseHandle(evt[3]);
+	return 0;
+}
+#endif
 
 int main(int argc, char *argv[])
 {
@@ -381,7 +420,7 @@ int main(int argc, char *argv[])
 	signal(SIGPIPE, SIG_IGN);
 #endif
 #ifdef WIN32
-	CreateThread(NULL, 0, ThreadFunc, NULL, 0, NULL);
+	CreateThread(NULL, 0, SigThreadProc, NULL, 0, NULL);
 #endif
 
 #ifdef WITH_BRIDGE
