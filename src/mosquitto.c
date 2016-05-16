@@ -212,16 +212,15 @@ void handle_sigusr2(int signal)
 }
 
 /*
-* Signalling mosquitto on NT.
+* Signalling mosquitto process on Win32.
 *
-* Under Unix, mosquitto can be told to shutdown or restart by sending various
-* signals (HUP, USR, TERM). On NT we don't have easy access to signals, so
-* we use "events" instead. Any of this events can be signalled:
+*  On Windows we we can use named events to pass signals to the mosquitto process. 
+*  List of events:
 *
-*    apPID_shutdown
-*    apPID_reload
-*    apPID_backup
-*    apPID_vacuum
+*    mosqPID_shutdown
+*    mosqPID_reload
+*    mosqPID_backup
+*    mosqPID_vacuum
 *
 * (where PID is the PID of the mosquitto process).
 */
@@ -230,13 +229,13 @@ DWORD WINAPI SigThreadProc(void* data) {
 	TCHAR evt_name[MAX_PATH];
 	static HANDLE evt[4];
 	int pid = GetCurrentProcessId();
-	sprintf_s(evt_name, MAX_PATH, "ap%d_shutdown", pid);
+	sprintf_s(evt_name, MAX_PATH, "mosq%d_shutdown", pid);
 	evt[0] = CreateEvent(NULL, TRUE, FALSE, evt_name);
-	sprintf_s(evt_name, MAX_PATH, "ap%d_reload", pid);
+	sprintf_s(evt_name, MAX_PATH, "mosq%d_reload", pid);
 	evt[1] = CreateEvent(NULL, FALSE, FALSE, evt_name);
-	sprintf_s(evt_name, MAX_PATH, "ap%d_backup", pid);
+	sprintf_s(evt_name, MAX_PATH, "mosq%d_backup", pid);
 	evt[2] = CreateEvent(NULL, FALSE, FALSE, evt_name);
-	sprintf_s(evt_name, MAX_PATH, "ap%d_vacuum", pid);
+	sprintf_s(evt_name, MAX_PATH, "mosq%d_vacuum", pid);
 	evt[3] = CreateEvent(NULL, FALSE, FALSE, evt_name);
 	while (true) {
 		int wr = WaitForMultipleObjects(sizeof(evt) / sizeof(HANDLE), evt, FALSE, INFINITE);
