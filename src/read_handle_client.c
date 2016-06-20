@@ -100,7 +100,7 @@ int mqtt3_handle_connack(struct mosquitto_db *db, struct mosquitto *context)
 			_mosquitto_log_printf(NULL, MOSQ_LOG_ERR, "Connection Refused: broker unavailable");
 			return 1;
 		case CONNACK_REFUSED_BAD_USERNAME_PASSWORD:
-			_mosquitto_log_printf(NULL, MOSQ_LOG_ERR, "Connection Refused: broker unavailable");
+			_mosquitto_log_printf(NULL, MOSQ_LOG_NOTICE, "Connection Refused: bad credentials");
 			return 1;
 		case CONNACK_REFUSED_NOT_AUTHORIZED:
 			_mosquitto_log_printf(NULL, MOSQ_LOG_ERR, "Connection Refused: not authorised");
